@@ -1,5 +1,18 @@
 version: "3"
 services:
+ elasticsearch:
+   image: elasticsearch:5.6
+   ports: 
+     - 9200:9200
+     - 9300:9300
+   environment:
+    - discovery.type=single-node
+# monitor:
+#   image: monitor-python-elastic
+#   environment:
+#    - ES_METRICS_CLUSTER_URL=http://192.168.15.69:9200
+#    - ES_METRICS_INDEX_NAME=test-monitor
+#    - ES_METRICS_MONITORING_CLUSTER_URL=http://192.168.15.69:9200
  grafana:
   image: grafana/grafana:5.1.0
   container_name: grafana
@@ -10,10 +23,3 @@ services:
   ports:
    - 3000:3000
   user: "104"
- elasticsearch:
-   image: elasticsearch:5.6
-   ports: 
-     - 9200:9200
-     - 9300:9300
-   environment:
-    - discovery.type=single-node

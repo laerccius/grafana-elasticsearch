@@ -6,6 +6,7 @@ import json
 import urllib2
 import os
 import sys
+import socket
 
 # ElasticSearch Cluster to Monitor
 elasticServer = os.environ.get('ES_METRICS_CLUSTER_URL', 'http://server1:9200')
@@ -14,7 +15,10 @@ interval = int(os.environ.get('ES_METRICS_INTERVAL', '60'))
 # ElasticSearch Cluster to Send Metrics
 elasticIndex = os.environ.get('ES_METRICS_INDEX_NAME', 'elasticsearch_metrics')
 elasticMonitoringCluster = os.environ.get('ES_METRICS_MONITORING_CLUSTER_URL', 'http://server2:9200')
-
+print "ES_METRICS_CLUSTER_URL %s " % elasticServer  
+print "ES_METRICS_INTERVAL  %s" % interval  
+print "ES_METRICS_INDEX_NAME  %s" % elasticIndex  
+print "ES_METRICS_MONITORING_CLUSTER_URL  %s" % elasticMonitoringCluster  
 # Enable Elasticsearch Security
 # read_username and read_password for read ES cluster information
 # write_username and write_passowrd for write monitor metric to ES.
@@ -50,6 +54,9 @@ def fetch_clusterhealth():
         utc_datetime = datetime.datetime.utcnow()
         endpoint = "/_cluster/health"
         urlData = elasticServer + endpoint
+        print "URl : %s" % urlData
+        print "read_username %s" % read_username
+        print "read_password %s" % read_password
         response = handle_urlopen(urlData,read_username,read_password)
         jsonData = json.loads(response.read())
         clusterName = jsonData['cluster_name']
@@ -130,6 +137,27 @@ def post_data(data):
     except Exception as e:
         print "Error:  {0}".format(str(e))
 
+def put_index():
+    utc_datetime = datetime.datetime.utcnow()
+    url_parameters = {'cluster': elasticServer, 'index': elasticIndex }
+    url = "%(cluster)s/%(index)s" % url_parameters
+    headers = {'content-type': 'application/json'}
+    data = {'mappings': {'my_type: {"properties": {"timestamp":  {"type":   "date"}}}}}
+    try:
+        req = urllib2.Request(url, headers=headers, data=json.dumps(data))
+        req.get_method = lambda: "PUT"
+
+        if write_es_security_enable:
+            password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+            password_mgr.add_password(None, url, write_username, write_password)
+            handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+            opener = urllib2.build_opener(handler)
+            urllib2.install_opener(opener)
+            response = urllib2.urlopen(req)
+        else:
+            response = urllib2.urlopen(req)
+    except Exception as e:
+        print "Error:  {0}".format(str(e))
 
 def main():
     clusterName = fetch_clusterhealth()
@@ -140,6 +168,22 @@ def main():
 
 
 if __name__ == '__main__':
+    pingcounter = 0
+    isreachable = False
+    while isreachable is False and pingcounter < 5:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print 'try %s' % pingcounter
+        try:
+            s.connect(('192.168.15.69', 9200))
+            isreachable = True
+        except socket.error as e:
+            time.sleep(1000)
+            pingcounter += 1
+        s.close()
+    if isreachable is False:
+        sys.exit(0)
+    else :
+        put_index()
     try:
         nextRun = 0
         while True:
